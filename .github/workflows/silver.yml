@@ -1,58 +1,27 @@
-name: Update Silver Price
+- name: Fetch silver price
+  env:
+    API_KEY: ${{ secrets.GOLDAPIKEY }}
+  run: |
+    echo "Starting API request..."
 
-on:
-  schedule:
-    - cron: "*/10 * * * *"   # هر 10 دقیقه
-  workflow_dispatch:
+    if [ -z "$API_KEY" ]; then
+      echo "❌ API KEY EMPTY"
+      echo '{"error":"API key missing"}' > silver.json
+      exit 0
+    fi
 
-jobs:
-  update:
-    runs-on: ubuntu-latest
+    response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+    -H "x-access-token: $API_KEY" \
+    https://api.gold-api.com/price/XAG)
 
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+    body=$(echo "$response" | sed -e 's/HTTPSTATUS\:.*//g')
+    status_code=$(echo "$response" | sed -e 's/.*HTTPSTATUS://')
 
-      - name: Fetch silver price
-        env:
-          API_KEY: ${{ secrets.GOLDAPIKEY }}
-        run: |
-          echo "Starting API request..."
+    echo "Status Code: $status_code"
+    echo "Response Body: $body"
 
-          if [ -z "$API_KEY" ]; then
-            echo "❌ API KEY EMPTY"
-            echo '{"error":"API key missing"}' > silver.json
-            exit 0
-          fi
-
-          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
-          -H "x-access-token: $API_KEY" \
-          https://api.gold-api.com/price/XAG)
-
-          body=$(echo "$response" | sed -e 's/HTTPSTATUS\:.*//g')
-          status_code=$(echo "$response" | sed -e 's/.*HTTPSTATUS://')
-
-          echo "Status Code: $status_code"
-          echo "Response Body: $body"
-
-          if [ "$status_code" -eq 200 ] && [ -n "$body" ]; then
-            echo "$body" > silver.json
-          else
-            echo "{\"error\":\"API failed\",\"status\":$status_code}" > silver.json
-          fi
-
-      - name: Show result
-        run: cat silver.json
-
-      - name: Commit changes
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-
-          git add silver.json
-
-          git commit -m "update silver price" || echo "No changes"
-
-          git pull --rebase origin main || true
-
-          git push origin HEAD:main
+    if [ "$status_code" -eq 200 ] && [ -n "$body" ]; then
+      echo "$body" > silver.json
+    else
+      echo "{\"error\":\"API failed\",\"status\":$status_code}" > silver.json
+    fi
