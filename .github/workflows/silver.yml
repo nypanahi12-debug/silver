@@ -21,11 +21,14 @@ jobs:
       - name: Show result
         run: cat silver.json
 
-      - name: Commit changes
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+     - name: Commit changes
+  run: |
+    git config user.name "github-actions"
+    git config user.email "github-actions@github.com"
 
-          git add silver.json
-          git commit -m "update silver price" || echo "No changes"
-          git push
+    git add silver.json
+
+    git commit -m "update silver price" || echo "No changes"
+
+    git pull --rebase origin main || true
+    git push origin HEAD:main
