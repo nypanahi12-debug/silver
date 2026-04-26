@@ -16,7 +16,7 @@ jobs:
       - name: Fetch silver price
         run: |
           curl -s -H "x-access-token: ${{ secrets.GOLDAPIKEY }}" \
-          https://www.gold-api.com/api/XAG/USD > silver.json
+          https://api.gold-api.com/price/XAG > silver.json
 
       - name: Show result
         run: cat silver.json
