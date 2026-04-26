@@ -9,19 +9,28 @@ jobs:
   update:
     runs-on: ubuntu-latest
 
+    env:
+      WORDPRESS_URL: "https://wikinoghreh.com/wp-json/silver/v1/update"  # URL وردپرس
+      API_KEY: "your_gold_api_key"  # کلید API شما (به صورت متغیر محیطی)
+      WP_AUTH: "github-silver-api:aC93dpqMcNFlG7ypJHBuP3wK"  # توکن وردپرس برای احراز هویت
+
     steps:
       - name: Fetch silver price
         id: fetch
         run: |
-          response=$(curl -s https://api.gold-api.com/price/XAG)
-
+          # دریافت قیمت نقره از API و استخراج قیمت
+          response=$(curl -s "https://api.gold-api.com/price/XAG?apikey=$API_KEY")
           price=$(echo $response | jq '.price')
 
-          echo "price=$price" >> $GITHUB_OUTPUT
+          echo "Fetched silver price: $price"
+          echo "price=$price" >> $GITHUB_ENV # استفاده از GITHUB_ENV برای انتقال داده‌ها به مراحل بعدی
 
       - name: Send to WordPress
         run: |
-          curl -X POST "https://wikinoghreh.com/wp-json/silver/v1/update" \
-          -u "github-silver-api:aC93dpqMcNFlG7ypJHBuP3wK" \
-          -H "Content-Type: application/json" \
-          -d "{\"price\": ${{ steps.fetch.outputs.price }}}"
+          # ارسال قیمت نقره به وردپرس
+          echo "Sending price ${{ env.price }} to WordPress"
+          
+          curl -X POST "$WORDPRESS_URL" \
+            -u "$WP_AUTH" \
+            -H "Content-Type: application/json" \
+            -d "{\"price\": \"${{ env.price }}\"}"
