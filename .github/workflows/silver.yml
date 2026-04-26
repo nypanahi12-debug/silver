@@ -12,7 +12,7 @@ jobs:
     env:
       WORDPRESS_URL: "https://wikinoghreh.com/wp-json/silver/v1/update"  # URL وردپرس
       API_KEY: "your_gold_api_key"  # کلید API شما (به صورت متغیر محیطی)
-      WP_AUTH: "github-silver-api:aC93dpqMcNFlG7ypJHBuP3wK"  # توکن وردپرس برای احراز هویت
+      WP_AUTH: "github-silver-api:aC93 dpqM cNFl G7yp JHBu P3wK"  # توکن وردپرس برای احراز هویت
 
     steps:
       - name: Fetch silver price
