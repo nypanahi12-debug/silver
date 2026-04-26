@@ -10,25 +10,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout repo
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # Step 2: Fetch silver price from GoldAPI
       - name: Fetch silver price
         run: |
           curl -s -H "x-access-token: ${{ secrets.GOLDAPIKEY }}" \
           https://www.goldapi.io/api/XAG/USD > silver.json
 
+      # Step 3: Show the result (for debugging)
       - name: Show result
         run: cat silver.json
 
-     - name: Commit changes
-  run: |
-    git config user.name "github-actions"
-    git config user.email "github-actions@github.com"
+      # Step 4: Commit changes to repo
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
 
-    git add silver.json
-
-    git commit -m "update silver price" || echo "No changes"
-
-    git pull --rebase origin main || true
-    git push origin HEAD:main
+          git add silver.json
+          git commit -m "update silver price" || echo "No changes"
+          
+          # Pull latest changes and resolve conflicts (if any)
+          git pull --rebase origin main || true
+          
+          # Push changes back to repo
+          git push origin HEAD:main
