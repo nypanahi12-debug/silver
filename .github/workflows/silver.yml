@@ -2,8 +2,11 @@ name: Update Silver Price
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # هر 15 دقیقه
+    - cron: "*/15 * * * *"
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   update:
@@ -17,13 +20,7 @@ jobs:
         env:
           API_KEY: ${{ secrets.GOLDAPIKEY }}
         run: |
-          echo "Starting API request..."
-
-          if [ -z "$API_KEY" ]; then
-            echo "❌ API KEY EMPTY"
-            echo '{"error":"API key missing"}' > silver.json
-            exit 0
-          fi
+          echo "Fetching silver price..."
 
           response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
           -H "x-access-token: $API_KEY" \
@@ -32,27 +29,20 @@ jobs:
           body=$(echo "$response" | sed -e 's/HTTPSTATUS\:.*//g')
           status_code=$(echo "$response" | sed -e 's/.*HTTPSTATUS://')
 
-          echo "Status Code: $status_code"
-          echo "Response Body: $body"
+          echo "Status: $status_code"
+          echo "$body" > silver.json
 
-          if [ "$status_code" -eq 200 ] && [ -n "$body" ]; then
-            echo "$body" > silver.json
-          else
-            echo "{\"error\":\"API failed\",\"status\":$status_code}" > silver.json
-          fi
+          cat silver.json
 
-      - name: Show result
-        run: cat silver.json
-
-      - name: Commit changes
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
           git add silver.json
 
-          git commit -m "update silver price" || echo "No changes"
+          git commit -m "update silver price $(date)" || echo "no changes"
 
-          git pull --rebase origin main || true
+          git pull --rebase origin main
 
-          git push origin HEAD:main
+          git push origin main
