@@ -14,23 +14,31 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Fetch silver price
+        env:
+          API_KEY: ${{ secrets.GOLDAPIKEY }}
         run: |
-          # ارسال درخواست به API و گرفتن وضعیت
-          response=$(curl -s -w "HTTPSTATUS:%{http_code}" -H "x-access-token: ${{ secrets.GOLDAPIKEY }}" \
+          echo "Starting API request..."
+
+          if [ -z "$API_KEY" ]; then
+            echo "❌ API KEY EMPTY"
+            echo '{"error":"API key missing"}' > silver.json
+            exit 0
+          fi
+
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+          -H "x-access-token: $API_KEY" \
           https://api.gold-api.com/price/XAG)
 
-          # جداسازی داده‌ها و کد وضعیت
           body=$(echo "$response" | sed -e 's/HTTPSTATUS\:.*//g')
           status_code=$(echo "$response" | sed -e 's/.*HTTPSTATUS://')
 
           echo "Status Code: $status_code"
           echo "Response Body: $body"
 
-          # اگر کد وضعیت 200 باشه، داده‌ها رو ذخیره می‌کنیم
-          if [ "$status_code" -eq 200 ]; then
+          if [ "$status_code" -eq 200 ] && [ -n "$body" ]; then
             echo "$body" > silver.json
           else
-            echo "{\"error\":\"Failed to fetch data, HTTP Status: $status_code\"}" > silver.json
+            echo "{\"error\":\"API failed\",\"status\":$status_code}" > silver.json
           fi
 
       - name: Show result
@@ -41,12 +49,10 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          # فقط در صورتی که فایل نیکه (خالی نباشه) commit می‌کنیم
-          if [[ -s silver.json ]]; then
-            git add silver.json
-            git commit -m "update silver price" || echo "No changes"
-            git pull --rebase origin main || true
-            git push origin HEAD:main
-          else
-            echo "Error: silver.json is empty or API failed."
-          fi
+          git add silver.json
+
+          git commit -m "update silver price" || echo "No changes"
+
+          git pull --rebase origin main || true
+
+          git push origin HEAD:main
