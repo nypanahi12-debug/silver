@@ -43,6 +43,4 @@ jobs:
 
           git commit -m "update silver price $(date)" || echo "no changes"
 
-          git pull --rebase origin main
-
           git push origin main
