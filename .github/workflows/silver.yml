@@ -15,8 +15,23 @@ jobs:
 
       - name: Fetch silver price
         run: |
-          curl -s -H "x-access-token: ${{ secrets.GOLDAPIKEY }}" \
-          https://api.gold-api.com/price/XAG > silver.json
+          # ارسال درخواست به API و گرفتن وضعیت
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" -H "x-access-token: ${{ secrets.GOLDAPIKEY }}" \
+          https://api.gold-api.com/price/XAG)
+
+          # جداسازی داده‌ها و کد وضعیت
+          body=$(echo "$response" | sed -e 's/HTTPSTATUS\:.*//g')
+          status_code=$(echo "$response" | sed -e 's/.*HTTPSTATUS://')
+
+          echo "Status Code: $status_code"
+          echo "Response Body: $body"
+
+          # اگر کد وضعیت 200 باشه، داده‌ها رو ذخیره می‌کنیم
+          if [ "$status_code" -eq 200 ]; then
+            echo "$body" > silver.json
+          else
+            echo "{\"error\":\"Failed to fetch data, HTTP Status: $status_code\"}" > silver.json
+          fi
 
       - name: Show result
         run: cat silver.json
@@ -26,10 +41,12 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git add silver.json
-
-          git commit -m "update silver price" || echo "No changes"
-
-          git pull --rebase origin main || true
-
-          git push origin HEAD:main
+          # فقط در صورتی که فایل نیکه (خالی نباشه) commit می‌کنیم
+          if [[ -s silver.json ]]; then
+            git add silver.json
+            git commit -m "update silver price" || echo "No changes"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
+          else
+            echo "Error: silver.json is empty or API failed."
+          fi
