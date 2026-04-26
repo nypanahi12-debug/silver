@@ -1,46 +1,27 @@
-name: Update Silver Price
+name: Update Silver Price Direct to WordPress
 
 on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   update:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
       - name: Fetch silver price
-        env:
-          API_KEY: ${{ secrets.GOLDAPIKEY }}
+        id: fetch
         run: |
-          echo "Fetching silver price..."
+          response=$(curl -s https://api.gold-api.com/price/XAG)
 
-          response=$(curl -s -w "HTTPSTATUS:%{http_code}" \
-          -H "x-access-token: $API_KEY" \
-          https://api.gold-api.com/price/XAG)
+          price=$(echo $response | jq '.price')
 
-          body=$(echo "$response" | sed -e 's/HTTPSTATUS\:.*//g')
-          status_code=$(echo "$response" | sed -e 's/.*HTTPSTATUS://')
+          echo "price=$price" >> $GITHUB_OUTPUT
 
-          echo "Status: $status_code"
-          echo "$body" > silver.json
-
-          cat silver.json
-
-      - name: Commit and push changes
+      - name: Send to WordPress
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-
-          git add silver.json
-
-          git commit -m "update silver price $(date)" || echo "no changes"
-
-          git push origin main
+          curl -X POST "https://wikinoghreh.com/wp-json/silver/v1/update" \
+          -u "github-silver-api:aC93 dpqM cNFl G7yp JHBu P3wK" \
+          -H "Content-Type: application/json" \
+          -d "{\"price\": ${{ steps.fetch.outputs.price }}}"
