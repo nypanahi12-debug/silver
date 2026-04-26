@@ -22,6 +22,6 @@ jobs:
       - name: Send to WordPress
         run: |
           curl -X POST "https://wikinoghreh.com/wp-json/silver/v1/update" \
-          -u "github-silver-api:aC93 dpqM cNFl G7yp JHBu P3wK" \
+          -u "github-silver-api:aC93dpqMcNFlG7ypJHBuP3wK" \
           -H "Content-Type: application/json" \
           -d "{\"price\": ${{ steps.fetch.outputs.price }}}"
