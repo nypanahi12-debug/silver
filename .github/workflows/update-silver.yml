@@ -14,32 +14,49 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install jq
-        run: sudo apt-get install jq -y
+        run: sudo apt-get update && sudo apt-get install jq -y
 
-      - name: Fetch silver price
+      - name: Fetch silver price (Fail-Safe)
         run: |
-          RESPONSE=$(curl -s -H "Authorization: Bearer 95365c27a11425d7437e16a78144ad876f3cea17ea5805d04dd0b51a8bd58dea" "https://api.gold-api.com/price/XAG")
+          echo "Fetching silver price..."
 
-          # استخراج قیمت از JSON (فرض: فیلد price)
-          PRICE=$(echo $RESPONSE | jq '.price')
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GOLD_API_KEY }}" "https://api.gold-api.com/price/XAG")
 
-          # ذخیره قیمت در فایل silver_price.json
+          echo "API Response:"
+          echo $RESPONSE
+
+          # استخراج price
+          PRICE=$(echo $RESPONSE | jq -r '.price')
+
+          echo "Extracted price: $PRICE"
+
+          # ❌ اگر null یا خالی بود → آپدیت نکن
+          if [ "$PRICE" = "null" ] || [ -z "$PRICE" ]; then
+            echo "❌ Error: price is null or empty. Skipping update."
+            exit 0
+          fi
+
+          # ❌ اگر عدد نبود → آپدیت نکن
+          if ! [[ "$PRICE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "❌ Error: price is not a valid number. Skipping update."
+            exit 0
+          fi
+
+          # ✅ ذخیره امن
           echo "{\"silver_price\": $PRICE}" > silver_price.json
 
-          # نمایش محتوای فایل JSON
+          echo "✅ Saved JSON:"
           cat silver_price.json
 
       - name: Commit & Push
         run: |
-          # تنظیم نام و ایمیل کاربری برای Git
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-          # اضافه کردن فایل جدید یا تغییرات
           git add silver_price.json
 
-          # بررسی تغییرات و commit کردن
-          if git diff-index --quiet HEAD; then
+          # فقط اگر تغییر داشت commit کن
+          if git diff --cached --quiet; then
             echo "No changes detected, skipping commit"
           else
             git commit -m "update silver price"
