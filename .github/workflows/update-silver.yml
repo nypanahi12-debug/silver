@@ -20,20 +20,28 @@ jobs:
         run: |
           RESPONSE=$(curl -s -H "Authorization: Bearer 95365c27a11425d7437e16a78144ad876f3cea17ea5805d04dd0b51a8bd58dea" "https://api.gold-api.com/price/XAG")
 
-          # استخراج قیمت (فرض: فیلد price)
+          # استخراج قیمت از JSON (فرض: فیلد price)
           PRICE=$(echo $RESPONSE | jq '.price')
 
+          # ذخیره قیمت در فایل silver_price.json
           echo "{\"silver_price\": $PRICE}" > silver_price.json
 
+          # نمایش محتوای فایل JSON
           cat silver_price.json
 
       - name: Commit & Push
         run: |
+          # تنظیم نام و ایمیل کاربری برای Git
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
+          # اضافه کردن فایل جدید یا تغییرات
           git add silver_price.json
 
-          git commit -m "update silver price" || echo "No changes"
-
-          git push
+          # بررسی تغییرات و commit کردن
+          if git diff-index --quiet HEAD; then
+            echo "No changes detected, skipping commit"
+          else
+            git commit -m "update silver price"
+            git push
+          fi
