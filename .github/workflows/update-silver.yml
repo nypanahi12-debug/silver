@@ -1,0 +1,39 @@
+name: Update Silver Price
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # هر 1 ساعت
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install jq -y
+
+      - name: Fetch silver price
+        run: |
+          RESPONSE=$(curl -s -H "Authorization: Bearer 95365c27a11425d7437e16a78144ad876f3cea17ea5805d04dd0b51a8bd58dea" "https://api.gold-api.com/price/XAG")
+
+          # استخراج قیمت (فرض: فیلد price)
+          PRICE=$(echo $RESPONSE | jq '.price')
+
+          echo "{\"silver_price\": $PRICE}" > silver_price.json
+
+          cat silver_price.json
+
+      - name: Commit & Push
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          git add silver_price.json
+
+          git commit -m "update silver price" || echo "No changes"
+
+          git push
