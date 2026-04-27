@@ -1,0 +1,53 @@
+name: Update Silver Price
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # این کار هر ساعت انجام می‌شود (بر اساس ساعت UTC)
+  workflow_dispatch:  # به شما این امکان را می‌دهد که به صورت دستی این فرآیند را راه‌اندازی کنید
+
+jobs:
+  update-price:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout مخزن
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      # نصب کتابخانه‌های مورد نیاز
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      # گرفتن قیمت نقره از API
+      - name: Get Silver Price from API
+        run: |
+          import requests
+          import json
+
+          api_key = '95365c27a11425d7437e16a78144ad876f3cea17ea5805d04dd0b51a8bd58dea'  # کلید API خودتان را وارد کنید
+          url = 'https://api.gold-api.com/price/XAG'
+          headers = {'Authorization': f'Bearer {api_key}'}
+          response = requests.get(url, headers=headers)
+          data = response.json()
+
+          silver_price = data['price']
+
+          # ذخیره قیمت در فایل JSON
+          with open('silver_price.json', 'w') as f:
+              json.dump({'silver_price': silver_price}, f)
+
+      # Commit کردن تغییرات به گیت‌هاب
+      - name: Commit and Push changes
+        uses: EndBug/add-and-commit@v7
+        with:
+          author_name: "GitHub Actions"
+          author_email: "actions@github.com"
+          message: "Update Silver Price"
+          add: "silver_price.json"
