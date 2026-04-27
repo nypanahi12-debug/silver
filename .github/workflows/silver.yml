@@ -1,4 +1,4 @@
-name: Update Silver Price Direct to WordPress
+name: Update Silver Price Secure
 
 on:
   schedule:
@@ -10,27 +10,33 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      WORDPRESS_URL: "https://wikinoghreh.com/wp-json/silver/v1/update"  # URL وردپرس
-      API_KEY: "your_gold_api_key"  # کلید API شما (به صورت متغیر محیطی)
-      WP_AUTH: "github-silver-api:aC93 dpqM cNFl G7yp JHBu P3wK"  # توکن وردپرس برای احراز هویت
+      WORDPRESS_URL: "https://wikinoghreh.com/wp-json/silver/v1/update"
+      API_KEY: "github-silver-api"
+      SECRET_TOKEN: "aC93dpqMcNFlG7ypJHBuP3wK" # ← دقیقاً مثل وردپرس
 
     steps:
       - name: Fetch silver price
-        id: fetch
         run: |
-          # دریافت قیمت نقره از API و استخراج قیمت
           response=$(curl -s "https://api.gold-api.com/price/XAG?apikey=$API_KEY")
-          price=$(echo $response | jq '.price')
 
-          echo "Fetched silver price: $price"
-          echo "price=$price" >> $GITHUB_ENV # استفاده از GITHUB_ENV برای انتقال داده‌ها به مراحل بعدی
+          echo "API Response: $response"
+
+          price=$(echo $response | jq -r '.price')
+
+          if [ "$price" = "null" ] || [ -z "$price" ]; then
+            echo "❌ Failed to fetch price"
+            exit 1
+          fi
+
+          echo "price=$price" >> $GITHUB_ENV
 
       - name: Send to WordPress
         run: |
-          # ارسال قیمت نقره به وردپرس
-          echo "Sending price ${{ env.price }} to WordPress"
-          
-          curl -X POST "$WORDPRESS_URL" \
-            -u "$WP_AUTH" \
+          echo "🚀 Sending price ${{ env.price }}"
+
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$WORDPRESS_URL" \
             -H "Content-Type: application/json" \
-            -d "{\"price\": \"${{ env.price }}\"}"
+            -H "x-api-key: $SECRET_TOKEN" \
+            -d "{\"price\": ${{ env.price }}}")
+
+          echo "$response"
