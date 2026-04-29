@@ -15,45 +15,54 @@ jobs:
       - name: Install jq
         run: |
           sudo apt-get update
-          sudo apt-get install jq -y
+          sudo apt-get install -y jq
 
       - name: Fetch silver price and update archive
+        shell: bash
         run: |
+          set -e
+
           echo "Fetching silver price..."
 
           RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GOLD_API_KEY }}" "https://api.gold-api.com/price/XAG")
 
           echo "API Response:"
-          echo $RESPONSE
+          echo "$RESPONSE"
 
-          PRICE=$(echo $RESPONSE | jq -r '.price')
+          PRICE=$(echo "$RESPONSE" | jq -r '.price')
 
           echo "Extracted price: $PRICE"
 
-          # اعتبارسنجی
-          if [ "$PRICE" = "null" ] || [ -z "$PRICE" ]; then
-            echo "Error: price is null or empty. Skipping update."
+          # ---------------------------
+          # VALIDATION
+          # ---------------------------
+          if [ -z "$PRICE" ] || [ "$PRICE" = "null" ]; then
+            echo "❌ Invalid price (null/empty). Skipping."
             exit 0
           fi
 
           if ! [[ "$PRICE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-            echo "Error: price is not valid. Skipping update."
+            echo "❌ Invalid price format. Skipping."
             exit 0
           fi
 
-          # timestamp
           NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          # اگر فایل وجود نداشت، بساز
-          if [ ! -f silver_price.json ]; then
+          # ---------------------------
+          # SAFE INIT JSON FILE
+          # ---------------------------
+          if [ ! -f silver_price.json ] || ! jq empty silver_price.json 2>/dev/null; then
             echo "[]" > silver_price.json
           fi
 
           echo "Appending new record..."
 
-          # اضافه کردن رکورد جدید + محدود کردن به 500 تا
+          # ---------------------------
+          # UPDATE ARCHIVE SAFELY
+          # ---------------------------
           UPDATED=$(jq --arg price "$PRICE" --arg time "$NOW" '
-            . += [{"price": ($price | tonumber), "time": $time}]
+            (if type == "array" then . else [] end)
+            + [{"price": ($price | tonumber), "time": $time}]
             | if length > 500 then .[-500:] else . end
           ' silver_price.json)
 
@@ -69,6 +78,6 @@ jobs:
 
           git add silver_price.json
 
-          git commit -m "update silver price" || echo "Nothing to commit"
+          git diff --cached --quiet && echo "No changes" || git commit -m "update silver price"
 
           git push
