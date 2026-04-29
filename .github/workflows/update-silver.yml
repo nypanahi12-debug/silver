@@ -6,15 +6,16 @@ on:
   workflow_dispatch:         # برای اجرای دستی هم (اختیاری ولی مفید)
 
 jobs:
-  update:
+  update-price:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install jq
-        run: sudo apt-get update && sudo apt-get install jq -y
+        run: |
+          sudo apt-get update
+          sudo apt-get install jq -y
 
       - name: Fetch silver price (Fail-Safe)
         run: |
@@ -25,27 +26,26 @@ jobs:
           echo "API Response:"
           echo $RESPONSE
 
-          # استخراج price
           PRICE=$(echo $RESPONSE | jq -r '.price')
 
           echo "Extracted price: $PRICE"
 
-          # ❌ اگر null یا خالی بود → آپدیت نکن
+          # اگر null یا خالی بود → آپدیت نکن
           if [ "$PRICE" = "null" ] || [ -z "$PRICE" ]; then
-            echo "❌ Error: price is null or empty. Skipping update."
+            echo "Error: price is null or empty. Skipping update."
             exit 0
           fi
 
-          # ❌ اگر عدد نبود → آپدیت نکن
+          # اگر عدد نبود → آپدیت نکن
           if ! [[ "$PRICE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-            echo "❌ Error: price is not a valid number. Skipping update."
+            echo "Error: price is not a valid number. Skipping update."
             exit 0
           fi
 
-          # ✅ ذخیره امن
+          # ذخیره
           echo "{\"silver_price\": $PRICE}" > silver_price.json
 
-          echo "✅ Saved JSON:"
+          echo "Saved JSON:"
           cat silver_price.json
 
       - name: Commit & Push
@@ -55,7 +55,6 @@ jobs:
 
           git add silver_price.json
 
-          # فقط اگر تغییر داشت commit کن
           if git diff --cached --quiet; then
             echo "No changes detected, skipping commit"
           else
