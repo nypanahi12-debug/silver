@@ -2,8 +2,8 @@ name: Update Silver Price
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # هر 15 دقیقه
-  workflow_dispatch:         # برای اجرای دستی هم (اختیاری ولی مفید)
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
 
 jobs:
   update-price:
@@ -17,7 +17,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install jq -y
 
-      - name: Fetch silver price (Fail-Safe)
+      - name: Fetch silver price and update archive
         run: |
           echo "Fetching silver price..."
 
@@ -30,22 +30,36 @@ jobs:
 
           echo "Extracted price: $PRICE"
 
-          # اگر null یا خالی بود → آپدیت نکن
+          # اعتبارسنجی
           if [ "$PRICE" = "null" ] || [ -z "$PRICE" ]; then
             echo "Error: price is null or empty. Skipping update."
             exit 0
           fi
 
-          # اگر عدد نبود → آپدیت نکن
           if ! [[ "$PRICE" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-            echo "Error: price is not a valid number. Skipping update."
+            echo "Error: price is not valid. Skipping update."
             exit 0
           fi
 
-          # ذخیره
-          echo "{\"silver_price\": $PRICE}" > silver_price.json
+          # timestamp
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          echo "Saved JSON:"
+          # اگر فایل وجود نداشت، بساز
+          if [ ! -f silver_price.json ]; then
+            echo "[]" > silver_price.json
+          fi
+
+          echo "Appending new record..."
+
+          # اضافه کردن رکورد جدید + محدود کردن به 500 تا
+          UPDATED=$(jq --arg price "$PRICE" --arg time "$NOW" '
+            . += [{"price": ($price | tonumber), "time": $time}]
+            | if length > 500 then .[-500:] else . end
+          ' silver_price.json)
+
+          echo "$UPDATED" > silver_price.json
+
+          echo "Updated JSON:"
           cat silver_price.json
 
       - name: Commit & Push
@@ -55,9 +69,6 @@ jobs:
 
           git add silver_price.json
 
-          if git diff --cached --quiet; then
-            echo "No changes detected, skipping commit"
-          else
-            git commit -m "update silver price"
-            git push
-          fi
+          git commit -m "update silver price" || echo "Nothing to commit"
+
+          git push
