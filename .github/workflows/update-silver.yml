@@ -2,18 +2,12 @@ name: Update Silver Price
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # هر 5 دقیقه چک
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 jobs:
   update-price:
     runs-on: ubuntu-latest
-
-    timeout-minutes: 5
-
-    concurrency:
-      group: silver-price
-      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v4
@@ -23,41 +17,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
-      - name: Check last run (15 min control)
-        id: timing
-        run: |
-          FILE=last_run.txt
-
-          NOW=$(date +%s)
-
-          if [ -f $FILE ]; then
-            LAST=$(cat $FILE)
-          else
-            LAST=0
-          fi
-
-          DIFF=$((NOW - LAST))
-
-          echo "Last run: $LAST"
-          echo "Now: $NOW"
-          echo "Diff: $DIFF seconds"
-
-          if [ $DIFF -lt 900 ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          echo "skip=false" >> $GITHUB_OUTPUT
-
       - name: Fetch silver price and update archive
-        if: steps.timing.outputs.skip != 'true'
         shell: bash
         run: |
           set -e
 
           echo "Fetching silver price..."
 
-          RESPONSE=$(curl -s --fail -H "Authorization: Bearer ${{ secrets.GOLD_API_KEY }}" "https://api.gold-api.com/price/XAG")
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.GOLD_API_KEY }}" "https://api.gold-api.com/price/XAG")
 
           echo "API Response:"
           echo "$RESPONSE"
@@ -79,13 +46,7 @@ jobs:
             exit 0
           fi
 
-          NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          NOW_EPOCH=$(date +%s)
-
-          # ---------------------------
-          # SAVE LAST RUN TIME
-          # ---------------------------
-          echo "$NOW_EPOCH" > last_run.txt
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
           # ---------------------------
           # SAFE INIT JSON FILE
@@ -96,7 +57,10 @@ jobs:
 
           echo "Appending new record..."
 
-          UPDATED=$(jq --arg price "$PRICE" --arg time "$NOW_ISO" '
+          # ---------------------------
+          # UPDATE ARCHIVE SAFELY
+          # ---------------------------
+          UPDATED=$(jq --arg price "$PRICE" --arg time "$NOW" '
             (if type == "array" then . else [] end)
             + [{"price": ($price | tonumber), "time": $time}]
             | if length > 500 then .[-500:] else . end
@@ -108,12 +72,11 @@ jobs:
           cat silver_price.json
 
       - name: Commit & Push
-        if: steps.timing.outputs.skip != 'true'
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-          git add silver_price.json last_run.txt
+          git add silver_price.json
 
           git diff --cached --quiet && echo "No changes" || git commit -m "update silver price"
 
