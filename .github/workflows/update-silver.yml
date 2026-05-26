@@ -9,6 +9,8 @@ jobs:
   update-price:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
     timeout-minutes: 5
 
     concurrency:
